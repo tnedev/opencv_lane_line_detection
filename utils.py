@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+from scipy.stats import linregress
+
 
 def grayscale(img):
     """Applies the Grayscale transform
@@ -44,30 +46,8 @@ def region_of_interest(img, vertices):
     return masked_image
 
 
-def draw_lines(img, left, right, color=[255, 0, 0], thickness=2):
-    global prev
-
-    if len(left) == 0 or len(right) == 0:
-        return img
-
-    left_x, left_y, left_m, left_c = lines_linreg(left)
-    right_x, right_y, right_m, right_c = lines_linreg(right)
-
-    min_y = np.min([np.min(left_y), np.min(right_y)])
-
-    top_right_point = np.array([(min_y - right_c) / right_m, min_y], dtype=int)
-    top_left_point = np.array([(min_y - left_c) / left_m, min_y], dtype=int)
-
-
-    max_y = np.max([np.max(right_y), np.max(left_y)])
-    bottom_left_point = np.array([(max_y - left_c) / left_m, max_y], dtype=int)
-    bottom_right_point = np.array([(max_y - right_c) / right_m, max_y], dtype=int)
-
-    cv2.line(img, (bottom_left_point[0], bottom_left_point[1]), (top_left_point[0], top_left_point[1]), color,
-             thickness)
-    cv2.line(img, (bottom_right_point[0], bottom_right_point[1]), (top_right_point[0], top_right_point[1]), color,
-             thickness)
-    return img
+def draw_line(img, d, u, color=[255, 0, 0], thickness=10):
+        cv2.line(img, (u[0], u[1]), (d[0], d[1]), color, thickness)
 
 
 def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
@@ -79,7 +59,7 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
     lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len,
                             maxLineGap=max_line_gap)
     line_img = np.zeros((*img.shape, 3), dtype=np.uint8)
-    draw_lines(line_img, lines)
+    draw_line(line_img, lines)
     return line_img
 
 
@@ -100,28 +80,33 @@ def weighted_img(img, initial_img, α=0.8, β=1., λ=0.):
     return cv2.addWeighted(initial_img, α, img, β, λ)
 
 
-# Takes an array of lines and gives back lines which have a valid slope, given a range.
-def slope_filter(lines_array, positive, min_slope, max_slope):
-    slopes = np.apply_along_axis(lambda row: (row[3] - row[1]) / (row[2] - row[0]), 2, lines_array)
+def separate_by_slope(lines, left_slope_range=(-0.5, -0.9), right_slope_range=(0.4, 0.8)):
 
-    if positive:
-        slopes[slopes > max_slope] = 0
-        slopes[slopes < min_slope] = 0
-        lines_array = np.array(lines_array[np.where(slopes > 0)])
-    else:
-        slopes[slopes < -max_slope] = 0
-        slopes[slopes > -min_slope] = 0
-        lines_array = np.array(lines_array[np.where(slopes < 0)])
+    left_line_points = []
+    right_line_points = []
 
-    return lines_array
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            slope = (y2-y1)/(x2-x1)
+            if left_slope_range[0] >= slope > left_slope_range[1]:
+                left_line_points.append([x1, y1])
+                left_line_points.append([x2, y2])
+            elif right_slope_range[0] <= slope < right_slope_range[1]:
+                right_line_points.append([x1, y1])
+                right_line_points.append([x2, y2])
+            else:
+                print(slope)
+
+    return left_line_points, right_line_points
 
 
-# Performs simple linear regression on a set of lines.
-def lines_linreg(lines_array):
-    x = np.reshape(lines_array[:, [0, 2]], (1, len(lines_array) * 2))[0]
-    y = np.reshape(lines_array[:, [1, 3]], (1, len(lines_array) * 2))[0]
-    A = np.vstack([x, np.ones(len(x))]).T
-    m, c = np.linalg.lstsq(A, y)[0]
-    x = np.array(x)
-    y = np.array(x * m + c)
-    return x, y, m, c
+def slope_from_lin_reg(points):
+    """
+    Find the slope of a line fitting between points
+    :param points:
+    :return:
+    """
+
+    slope, intercept, r_value, p_value, std_err = linregress(points)
+
+    return slope

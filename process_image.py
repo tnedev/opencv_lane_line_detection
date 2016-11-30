@@ -1,6 +1,9 @@
 import numpy as np
 import cv2
-from utils import grayscale, canny, hough_lines, weighted_img, gaussian_blur, region_of_interest, draw_lines, slope_filter
+from utils import grayscale, canny, hough_lines, weighted_img, gaussian_blur, region_of_interest, draw_line, \
+    separate_by_slope, slope_from_lin_reg
+from scipy.stats import linregress
+
 
 def process_image(image):
     original_image = image.copy()
@@ -41,10 +44,24 @@ def process_image(image):
     lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),
                             min_line_length, max_line_gap)
 
-    lines_left = slope_filter(lines, False, .5, .9)
-    lines_right = slope_filter(lines, True, .5, .9)
+    left_points, right_points = separate_by_slope(lines)
 
-    draw_lines(line_image, lines_left, lines_right, [255, 0, 0], 10)
+    if left_points:
+        # Find the slope based on the generated points for the left line
+        slope = slope_from_lin_reg (left_points)
+        # Calculate x for the largest y. i.e find the lowest point on the image part of the  extrapolate line
+        x2 = int(max(left_points)[0] + (ysize-max(left_points)[1])/slope)
+        up_left_point = max(left_points)
+        down_left_point = [x2, ysize]
+        draw_line(line_image, up_left_point, down_left_point)
+
+    if right_points:
+        slope = slope_from_lin_reg(right_points)
+        # Calculate x for the largest y. i.e find the lowest point on the image part of the  extrapolate line
+        x2 = int(max(right_points)[0] + (ysize - max(right_points)[1]) / slope)
+        up_right_point = min(right_points)
+        down_right_point = [x2, ysize]
+        draw_line(line_image, up_right_point, down_right_point)
 
     # Draw the lines on the edge image
     lines_edges = weighted_img(line_image, original_image)

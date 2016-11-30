@@ -1,17 +1,24 @@
 from process_image import process_image
+from PIL import Image
 from moviepy.editor import VideoFileClip
 
-white_output = 'out/solidYellowLeftOut.mp4'
+output = 'out/solidYellowLeftOut.mp4'
 clip1 = VideoFileClip("solidYellowLeft.mp4")
-white_clip = clip1.fl_image(process_image)
-white_clip.write_videofile(white_output, audio=False)
+clip = clip1.fl_image(process_image)
+clip.write_videofile(output, audio=False)
 
-white_output = 'out/solidWhiteRightOut.mp4'
+output = 'out/solidWhiteRightOut.mp4'
 clip1 = VideoFileClip("solidWhiteRight.mp4")
-white_clip = clip1.fl_image(process_image)
-white_clip.write_videofile(white_output, audio=False)
+clip = clip1.fl_image(process_image)
+clip.write_videofile(output, audio=False)
 
-white_output = 'out/challengeOut.mp4'
+output = 'out/challengeOut.mp4'
 clip1 = VideoFileClip("challenge.mp4")
-white_clip = clip1.fl_image(process_image)
-white_clip.write_videofile(white_output, audio=False)
+clip = clip1.fl_image(process_image)
+clip.write_videofile(output, audio=False)
+
+# import matplotlib.image as mpimg
+#
+# image = mpimg.imread('test_images/solidWhiteCurve.jpg')
+# output = process_image(image)
+# Image.fromarray(output).save('out/out.jpg')
